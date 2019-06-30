@@ -3,7 +3,7 @@
 *
 *  Created: 6/16/2019 9:25:12 PM
 *  Author: Ilija K. & Josi Brauer
-*  Version: 7
+*  Version: 8
 */
 
 ; Variable Declaration
@@ -14,81 +14,33 @@
 ; Own Variables
 .def InputCount = R24
 .def LastState = R25
-.def Cntr = R17
-.DSEG
-.ORG $0100
-; Deprecated CODE
+.def Counter = R17
+.def Zero = R16
 
-.CSEG
-;.ORG $0000
+	RCALL INIT_STACK
+	RCALL INIT_PORTS
 
-;TODO: USE TRI-STATE PORTX ADDITIONALLY TO DDRX!!!
-; Init. of PortA,B,D
-LDI Temp, 0b01111110	;PA7,PA0: IN
-OUT DDRA, Temp
-;OUT PORTA, Temp			;Tristate
 
-LDI Temp, 0b11111111	;PB0-5: OUT
-OUT DDRB, Temp
-
-LDI Temp, 0b11111111	;PD0-3: OUT
-OUT DDRD, Temp
-
-; Init. of Stackpointer
-LDI Temp, high(RAMEND)
-OUT SPH, Temp
-LDI Temp, low(RAMEND)
-OUT SPL, Temp
-
-; Init States
-CLR LastState
-
-; Main Loop
 MAIN:
-	CLR Fail
-	CLR Temp
-
-	LDI ZH, high(CODE<<1)	;No idea what '<<' is for!?
-	LDI ZL, low(CODE<<1)
-	;4x
-
+	RCALL INIT_VARS
 ; LoopCounter
-	LDI Cntr, 0x04
+	LDI Counter, 0x04
 	CLR InputCount				;Lower Nibble is the one displayed
-FORLOOP:
-	SEC							; Set Carry
-	ROL InputCount				; Successively adds 1s at the end
-	OUT PORTB, InputCount
-	CALL POLL_BUTTONS
-	;Comparison
-	LPM Temp, Z+
-	CPSE Digit, Temp
-	INC Fail
-	DEC Cntr
-	BRNE FORLOOP
-;CHECK_FAIL:
-	TST Fail					;Activates Z- or N-Flag
-	BREQ GREEN_LIGHT			;Reacts to Z-Flag
-	LDI Temp, 0b00101111
-	OUT PORTB, Temp				;Redlight
-	JMP NEXT
-
-GREEN_LIGHT:
-	LDI Temp, 0b00011111
-	OUT PORTB, Temp; DDRB
-
-NEXT:
-	CALL WAIT_ENTER
+LOOP:
+	RCALL DISPLAY_ATTEMPT_NUM
+	RCALL POLL_BUTTONS
+	RCALL INPUT_PROOFING
+	DEC Counter
+	BRNE LOOP
+	RCALL CHECK_FAIL
+	RCALL WAIT_ENTER
 	JMP MAIN
 
 WAIT_KEYPRESS:
 	MOV Temp, ButtonStates	;Save prev.
 	IN ButtonStates, PORTA
-	CP Temp, ButtonStates
-	BRCS EXIT_KEYPRESS
+	CPSE Temp, ButtonStates
 	JMP WAIT_KEYPRESS
-
-EXIT_KEYPRESS:
 	RET
 
 WAIT_ENTER:
@@ -149,6 +101,62 @@ INCREMENTOR:
 
 SKIP_SUB:
 	out PortD, Digit
+	RET
+
+INIT_PORTS:
+	LDI Temp, 0b01111110	;PA7,PA0: IN
+	OUT DDRA, Temp
+	;OUT PORTA, Temp			;Tristate
+
+	LDI Temp, 0b11111111	;PB0-5: OUT
+	OUT DDRB, Temp
+
+	LDI Temp, 0b11111111	;PD0-3: OUT
+	OUT DDRD, Temp
+	RET
+
+INIT_STACK:
+	LDI Temp, high(RAMEND)
+	OUT SPH, Temp
+	LDI Temp, low(RAMEND)
+	OUT SPL, Temp
+	RET
+
+INIT_VARS:
+	CLR LastState
+	CLR Fail
+	CLR Temp
+	CLR Zero
+
+	LDI ZH, high(CODE<<1)	;No idea what '<<' is for!?
+	LDI ZL, low(CODE<<1)
+	RET
+
+DISPLAY_ATTEMPT_NUM:
+	SEC							; Set Carry
+	ROL InputCount				; Successively adds 1s at the end
+	OUT PORTB, InputCount
+	RET
+
+INPUT_PROOFING:
+	LPM Temp, Z+
+	CPSE Digit, Temp
+	INC Fail
+	RET
+
+CHECK_FAIL:
+	RCALL GREEN_LIGHT
+	CPSE Fail, Zero
+	RCALL RED_LIGHT
+	RET
+
+RED_LIGHT:
+	CBI PORTB, 4
+	SBI PORTB, 5
+	RET
+
+GREEN_LIGHT:
+	SBI PORTB, 4
 	RET
 
 ; //////////////END///////////////
