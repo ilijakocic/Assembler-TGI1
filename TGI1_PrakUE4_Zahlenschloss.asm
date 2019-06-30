@@ -25,7 +25,7 @@ MAIN:
 	RCALL INIT_VARS
 ; LoopCounter
 	LDI Counter, 0x04
-	CLR InputCount				;Lower Nibble is the one displayed
+	CLR InputCount				; Lower Nibble is the one displayed.
 LOOP:
 	RCALL DISPLAY_ATTEMPT_NUM
 	RCALL POLL_BUTTONS
@@ -36,43 +36,36 @@ LOOP:
 	RCALL WAIT_ENTER
 	JMP MAIN
 
+;  Subroutines
+
 WAIT_KEYPRESS:
-	MOV Temp, ButtonStates	;Save prev.
+	MOV Temp, ButtonStates		; Save prev.
 	IN ButtonStates, PORTA
 	CPSE Temp, ButtonStates
 	JMP WAIT_KEYPRESS
 	RET
 
 WAIT_ENTER:
-	;MOV Temp, ButtonStates	;Save prev. ;Deprecated prolly 'cuz of Tristate
 	IN ButtonStates, PINA
+	SBRS ButtonStates, 7		; Register Enter keypress
+	RJMP WAIT_ENTER				; Loop until key pressed
 
-	ANDI ButtonStates, 0b10000000
-	;CP Temp, ButtonStates
-	BREQ WAIT_ENTER
+ENTER_LETGO:
+	IN ButtonStates, PINA
+	SBRC Buttonstates, 7		; Register letting go of key
+	RJMP ENTER_LETGO
 	RET
 
 
-WAIT_INCREMENTOR:
-	MOV Temp, ButtonStates	;Save prev.
-	IN ButtonStates, PORTA
 
-	ANDI ButtonStates, 0b00000001
-	CP Temp, ButtonStates
-	INC DIGIT
-	JMP WAIT_INCREMENTOR
 
-EXIT_INCREMENTOR:
-	RET
-
-;  Procedure
 
 POLL_BUTTONS:
 	CLR Digit
 	OUT PORTD, Digit
 	IN ButtonStates, PINA
 POLL_LOOP:
-	IN Temp, PINA		;Read Raw-Input
+	IN Temp, PINA				; Read Raw-Input
 
 	SBRS ButtonStates, 0		; Check for Incrmntr-Input
 	RJMP NEXT_IF
@@ -92,26 +85,23 @@ SKIP1:
 INCREMENTOR:
 	INC Digit
 
-	LDI Temp, 10				;Req. For Modulo Base 10
+	LDI Temp, 10				; Req. For Modulo Base 10.
 	CP Digit, Temp
 	BRNE SKIP_SUB
 	SUBI Digit, 10
 
-	;Implicit Return statement because of end
-
 SKIP_SUB:
-	out PortD, Digit
+	OUT PORTD, Digit
 	RET
 
 INIT_PORTS:
-	LDI Temp, 0b01111110	;PA7,PA0: IN
+	LDI Temp, 0b01111110		;PA7,PA0: IN
 	OUT DDRA, Temp
-	;OUT PORTA, Temp			;Tristate
 
-	LDI Temp, 0b11111111	;PB0-5: OUT
+	LDI Temp, 0b11111111		;PB0-5: OUT
 	OUT DDRB, Temp
 
-	LDI Temp, 0b11111111	;PD0-3: OUT
+	LDI Temp, 0b11111111		;PD0-3: OUT
 	OUT DDRD, Temp
 	RET
 
